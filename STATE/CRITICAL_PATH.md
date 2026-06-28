@@ -15,11 +15,12 @@
    secrets confined to securityeval_raw.jsonl, no real key, 0 remotes, pin intact
    (rein 0.4.0 in site-packages). LEDGER L6. Item 3 CLOSED.
 
-4. RESTART clean Keystone runs under pinned 0.4.0 + fixed pacing - NOW (item 1).
-   HUMAN GATE (consumes free Gemini quota, starts the multi-week clock): routed to
-   NEEDS-HUMAN 2026-06-28T0702Z. Run `window.sh` daily after 15:00 local; finalize at
-   N>=50 -> aggregate/audit -> RESULTS.md -> paired stat test. The baseline (5a39750)
-   + the pinned 0.4.0 arm are the frozen config the run sits on.
+4. RESTART clean Keystone runs - RUNNING (human started the first clean window
+   2026-06-28 ~16:05 CST; task 1 CWE-020 completed 85s under pinned 0.4.0, cleared the
+   pre-pin gencache first). Now a daily grind: `window.sh` once/day, stops cleanly at
+   the free-tier quota, resumes next day. NEXT HUMAN TOUCH is at N>=50 -> aggregate.py
+   + audit.py -> RESULTS.md -> paired stat test. Multi-week clock; no constellation
+   action until the corpus fills.
 
 5. PARALLEL (unblocked once the arm is pinned):
    - rein-ops hardening: validator SLICE 1 DONE - commit `9e45eaf`, 23/23 tests,
@@ -40,8 +41,13 @@
      exact defect 0744 was written to fix; 51 tests + an AUDITOR pass missed it because
      they checked the code's own design, not the ratified spec). Also implemented
      `superseded->stale` instead of the specified LIVENESS signal. ITEM 5 NOT COMPLETE.
-     FIX DISPATCHED to DEV 2026-06-28T0754Z (BUS/...slice3-fix.md, ratified):
-     verification belongs in ACTIONABLE, stale = open `check` ONLY, superseded/old
-     actionable -> LIVENESS not archival, with a MANDATORY regression test on the
-     verification-actionable case. Item 5 closes only after the re-check passes.
+     FIX (0754) DELIVERED+committed (f43f05e): classification now CORRECT - MASTER
+     verified on the live bus 2026-06-28T0812Z that 0808 (verification) is ACTIONABLE
+     not stale, STALE-OPEN=checks only, 0652 under LIVENESS (BAR-1..4 met). BUT the
+     re-check FAILED on the SUITE: 54 passed / 1 FAILED - `test_live_human_queue_open_item`
+     reads the LIVE NEEDS-HUMAN and rotted when the item-4 gate was resolved (brittle
+     live-coupled test, violates the fixture-pinned guardrail). DE-BRITTLE DISPATCHED
+     to DEV 2026-06-28T0813Z (BUS/...detrittle-tests.md, ratified): make the live
+     positive-control tests fixture-based, suite green + deterministic w.r.t. live STATE.
+     Item 5 closes only after the suite is green and rot-proof.
    - dup.function index cache (DECISIONS #47) when loop-latency evidence warrants.
