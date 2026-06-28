@@ -1,8 +1,8 @@
 """Tests for slice 2: derived turn computation and reply legality.
 
-Deterministic and offline. Turn assertions use constructed snapshots (the live
-bus mutates as chats reply); a skip-guarded test pins the permanently-answered
-live messages.
+Deterministic and offline. Turn assertions use constructed (synthetic) snapshots
+rather than live BUS reads, so the suite never couples to which messages exist on
+the live bus.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import os
 import pytest
 
 from validator.cli import main
-from validator.core import Msg, parse_message
+from validator.core import Msg
 from validator.turn import open_messages, reply_problems, turn_for
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,19 +22,21 @@ def _m(name: str, frm: str, to: str, typ: str, re: str) -> Msg:
     return Msg(filename=name, fields={"from": frm, "to": to, "type": typ, "re": re}, body="b")
 
 
-# A snapshot mirroring the live bus shape at the moment slice 2 is the DEV turn.
+# A synthetic snapshot mirroring the live bus SHAPE (the same re: chains, from/to,
+# and types) at the moment slice 2 is the DEV turn. Stamps are synthetic (T0901..)
+# so no test couples to a real on-bus filename.
 def _snapshot() -> list[Msg]:
     return [
-        _m("20260628T0632-MASTER-to-MAIN-eval-baseline.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#3"),
-        _m("20260628T0643-MASTER-to-DEV-validator-slice1.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
-        _m("20260628T0644-MAIN-to-MASTER-eval-baseline.md", "MAIN", "MASTER", "bounce", "20260628T0632-MASTER-to-MAIN-eval-baseline.md"),
-        _m("20260628T0650-MAIN-to-MASTER-eval-baseline.md", "MAIN", "MASTER", "verification", "20260628T0632-MASTER-to-MAIN-eval-baseline.md"),
-        _m("20260628T0652-MASTER-to-MAIN-eval-baseline-ratify.md", "MASTER", "MAIN", "directive", "20260628T0644-MAIN-to-MASTER-eval-baseline.md"),
-        _m("20260628T0658-DEV-to-MAIN-validator-slice1.md", "DEV", "MAIN", "deliverable", "20260628T0643-MASTER-to-DEV-validator-slice1.md"),
-        _m("20260628T0702-MASTER-to-MAIN-eval-baseline-check.md", "MASTER", "MAIN", "check", "20260628T0650-MAIN-to-MASTER-eval-baseline.md"),
-        _m("20260628T0712-MAIN-to-MASTER-validator-slice1.md", "MAIN", "MASTER", "verification", "20260628T0658-DEV-to-MAIN-validator-slice1.md"),
-        _m("20260628T0713-MASTER-to-MAIN-validator-slice1-check.md", "MASTER", "MAIN", "check", "20260628T0712-MAIN-to-MASTER-validator-slice1.md"),
-        _m("20260628T0714-MASTER-to-DEV-validator-slice2.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
+        _m("20260628T0901-MASTER-to-MAIN-eval-baseline.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#3"),
+        _m("20260628T0902-MASTER-to-DEV-validator-slice1.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
+        _m("20260628T0903-MAIN-to-MASTER-eval-baseline.md", "MAIN", "MASTER", "bounce", "20260628T0901-MASTER-to-MAIN-eval-baseline.md"),
+        _m("20260628T0904-MAIN-to-MASTER-eval-baseline.md", "MAIN", "MASTER", "verification", "20260628T0901-MASTER-to-MAIN-eval-baseline.md"),
+        _m("20260628T0905-MASTER-to-MAIN-eval-baseline-ratify.md", "MASTER", "MAIN", "directive", "20260628T0903-MAIN-to-MASTER-eval-baseline.md"),
+        _m("20260628T0906-DEV-to-MAIN-validator-slice1.md", "DEV", "MAIN", "deliverable", "20260628T0902-MASTER-to-DEV-validator-slice1.md"),
+        _m("20260628T0907-MASTER-to-MAIN-eval-baseline-check.md", "MASTER", "MAIN", "check", "20260628T0904-MAIN-to-MASTER-eval-baseline.md"),
+        _m("20260628T0908-MAIN-to-MASTER-validator-slice1.md", "MAIN", "MASTER", "verification", "20260628T0906-DEV-to-MAIN-validator-slice1.md"),
+        _m("20260628T0909-MASTER-to-MAIN-validator-slice1-check.md", "MASTER", "MAIN", "check", "20260628T0908-MAIN-to-MASTER-validator-slice1.md"),
+        _m("20260628T0910-MASTER-to-DEV-validator-slice2.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
     ]
 
 
@@ -44,28 +46,28 @@ def _names(msgs) -> set[str]:
 
 def test_open_set_matches_bar() -> None:
     opens = _names(open_messages(_snapshot()))
-    assert {"20260628T0652-MASTER-to-MAIN-eval-baseline-ratify.md",
-            "20260628T0702-MASTER-to-MAIN-eval-baseline-check.md",
-            "20260628T0713-MASTER-to-MAIN-validator-slice1-check.md",
-            "20260628T0714-MASTER-to-DEV-validator-slice2.md"} == opens
+    assert {"20260628T0905-MASTER-to-MAIN-eval-baseline-ratify.md",
+            "20260628T0907-MASTER-to-MAIN-eval-baseline-check.md",
+            "20260628T0909-MASTER-to-MAIN-validator-slice1-check.md",
+            "20260628T0910-MASTER-to-DEV-validator-slice2.md"} == opens
     # BAR row 1: these each have a later re: and must NOT be open.
-    for answered in ("0644", "0650", "0658", "0712"):
+    for answered in ("0903", "0904", "0906", "0908"):
         assert not any(answered in n for n in opens)
 
 
 def test_turn_for_roles() -> None:
     snap = _snapshot()
-    assert turn_for("DEV", snap).filename == "20260628T0714-MASTER-to-DEV-validator-slice2.md"
-    assert turn_for("MAIN", snap).filename == "20260628T0713-MASTER-to-MAIN-validator-slice1-check.md"
+    assert turn_for("DEV", snap).filename == "20260628T0910-MASTER-to-DEV-validator-slice2.md"
+    assert turn_for("MAIN", snap).filename == "20260628T0909-MASTER-to-MAIN-validator-slice1-check.md"
     assert turn_for("MASTER", snap) is None  # waiting
 
 
 def test_turn_waiting_after_reply() -> None:
     snap = _snapshot()
-    snap.append(_m("20260628T0720-DEV-to-MAIN-validator-slice2.md", "DEV", "MAIN", "deliverable",
-                   "20260628T0714-MASTER-to-DEV-validator-slice2.md"))
-    assert turn_for("DEV", snap) is None  # 0714 now answered
-    assert turn_for("MAIN", snap).filename == "20260628T0720-DEV-to-MAIN-validator-slice2.md"
+    snap.append(_m("20260628T0911-DEV-to-MAIN-validator-slice2.md", "DEV", "MAIN", "deliverable",
+                   "20260628T0910-MASTER-to-DEV-validator-slice2.md"))
+    assert turn_for("DEV", snap) is None  # 0910 now answered
+    assert turn_for("MAIN", snap).filename == "20260628T0911-DEV-to-MAIN-validator-slice2.md"
 
 
 def test_answered_by_bare_id() -> None:
@@ -118,16 +120,15 @@ def test_cli_bus_planted_dangling_re_exit_nonzero(tmp_path, capsys) -> None:
     assert rc == 1
 
 
-# -- live-bus stable facts (skip if archived) ---------------------------------
+# -- answered-vs-open logic (fixtures, no live bus) ---------------------------
 
-@pytest.mark.parametrize("answered", [
-    "20260628T0644-MAIN-to-MASTER-eval-baseline.md",
-    "20260628T0658-DEV-to-MAIN-validator-slice1.md",
-])
-def test_live_answered_not_open(answered) -> None:
-    bus = os.path.join(_ROOT, "BUS")
-    if not os.path.isfile(os.path.join(bus, answered)):
-        pytest.skip(f"{answered} no longer on the live bus")
-    import glob
-    msgs = [parse_message(open(p, encoding="utf-8").read(), p) for p in glob.glob(os.path.join(bus, "*.md"))]
-    assert answered not in _names(open_messages(msgs))
+def test_answered_not_open() -> None:
+    # M is answered by a later message whose re: points at it -> NOT open.
+    # An unanswered fixture message IS open. Pure fixtures, no live reads.
+    answered = _m("20260628T0920-MASTER-to-DEV-x.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#1")
+    answer = _m("20260628T0921-DEV-to-MAIN-x.md", "DEV", "MAIN", "deliverable",
+                "20260628T0920-MASTER-to-DEV-x.md")
+    unanswered = _m("20260628T0922-MASTER-to-DEV-y.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#2")
+    opens = _names(open_messages([answered, answer, unanswered]))
+    assert "20260628T0920-MASTER-to-DEV-x.md" not in opens
+    assert "20260628T0922-MASTER-to-DEV-y.md" in opens

@@ -6,9 +6,8 @@ tmp_path, and the live-bus positive control reads the real BUS/STATE when presen
 
 from __future__ import annotations
 
+import glob
 import os
-
-import pytest
 
 from validator.cli import main
 from validator.core import validate_message, validate_state
@@ -22,7 +21,7 @@ _BASE = {
     "re": "CRITICAL_PATH#5",
     "ratified": "true",
 }
-_NAME = "20260628T0643-MASTER-to-DEV-validator-slice1.md"
+_NAME = "20260628T0930-MASTER-to-DEV-validator-slice1.md"
 
 
 def _msg(fields: dict[str, str], body: str = "\nBuild the thing.\n") -> str:
@@ -77,7 +76,7 @@ def test_unratified_directive_to_dev() -> None:
 
 def test_unratified_directive_to_main() -> None:
     fields = {**_BASE, "to": "MAIN", "ratified": "false"}
-    name = "20260628T0632-MASTER-to-MAIN-eval-baseline.md"
+    name = "20260628T0931-MASTER-to-MAIN-eval-baseline.md"
     assert "message.unratified-build" in _rules(validate_message(_msg(fields), name))
 
 
@@ -143,18 +142,14 @@ def test_cli_state_flag(tmp_path) -> None:
     assert main(["--state", _state(tmp_path)]) == 0
 
 
-# -- live-bus positive control (skips if the bus has been archived) -----------
+# -- live-bus positive control (robust smoke: validates whatever exists) -------
 
-@pytest.mark.parametrize("name", [
-    "20260628T0632-MASTER-to-MAIN-eval-baseline.md",
-    "20260628T0643-MASTER-to-DEV-validator-slice1.md",
-])
-def test_live_bus_messages_clean(name) -> None:
-    path = os.path.join(_ROOT, "BUS", name)
-    if not os.path.isfile(path):
-        pytest.skip(f"{name} no longer on the live bus")
-    with open(path, encoding="utf-8") as fh:
-        assert validate_message(fh.read(), path) == []
+def test_live_bus_messages_clean() -> None:
+    # Glob every message present on the live bus and assert each validates clean.
+    # Robust to archival: archiving shrinks the set, it never reddens the suite.
+    for path in sorted(glob.glob(os.path.join(_ROOT, "BUS", "*.md"))):
+        with open(path, encoding="utf-8") as fh:
+            assert validate_message(fh.read(), path) == [], path
 
 
 def test_live_state_clean() -> None:

@@ -88,20 +88,21 @@ def test_human_queue_empty_and_header_only() -> None:
 # -- actionable_open / stale_open (BAR row 2) ---------------------------------
 
 def _snapshot() -> list[Msg]:
-    """Mirrors the live bus shape: 4 open, 2 actionable, 2 stale."""
+    """Mirrors the live bus SHAPE: 4 open, 2 actionable, 2 stale. Stamps are
+    synthetic (T0901..) so no assertion couples to a real on-bus filename."""
     return [
-        _m("20260628T0632-MASTER-to-MAIN-eval-baseline.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#3"),
-        _m("20260628T0643-MASTER-to-DEV-validator-slice1.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
-        _m("20260628T0644-MAIN-to-MASTER-eval-baseline.md", "MAIN", "MASTER", "bounce", "20260628T0632-MASTER-to-MAIN-eval-baseline.md"),
-        _m("20260628T0650-MAIN-to-MASTER-eval-baseline.md", "MAIN", "MASTER", "verification", "20260628T0632-MASTER-to-MAIN-eval-baseline.md"),
-        _m("20260628T0652-MASTER-to-MAIN-eval-baseline-ratify.md", "MASTER", "MAIN", "directive", "20260628T0644-MAIN-to-MASTER-eval-baseline.md"),
-        _m("20260628T0658-DEV-to-MAIN-validator-slice1.md", "DEV", "MAIN", "deliverable", "20260628T0643-MASTER-to-DEV-validator-slice1.md"),
-        _m("20260628T0702-MASTER-to-MAIN-eval-baseline-check.md", "MASTER", "MAIN", "check", "20260628T0650-MAIN-to-MASTER-eval-baseline.md"),
-        _m("20260628T0712-MAIN-to-MASTER-validator-slice1.md", "MAIN", "MASTER", "verification", "20260628T0658-DEV-to-MAIN-validator-slice1.md"),
-        _m("20260628T0713-MASTER-to-MAIN-validator-slice1-check.md", "MASTER", "MAIN", "check", "20260628T0712-MAIN-to-MASTER-validator-slice1.md"),
-        _m("20260628T0714-MASTER-to-DEV-validator-slice2.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
-        _m("20260628T0726-DEV-to-MAIN-validator-slice2.md", "DEV", "MAIN", "deliverable", "20260628T0714-MASTER-to-DEV-validator-slice2.md"),
-        _m("20260628T0735-MAIN-to-MASTER-validator-slice2.md", "MAIN", "MASTER", "verification", "20260628T0726-DEV-to-MAIN-validator-slice2.md"),
+        _m("20260628T0901-MASTER-to-MAIN-eval-baseline.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#3"),
+        _m("20260628T0902-MASTER-to-DEV-validator-slice1.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
+        _m("20260628T0903-MAIN-to-MASTER-eval-baseline.md", "MAIN", "MASTER", "bounce", "20260628T0901-MASTER-to-MAIN-eval-baseline.md"),
+        _m("20260628T0904-MAIN-to-MASTER-eval-baseline.md", "MAIN", "MASTER", "verification", "20260628T0901-MASTER-to-MAIN-eval-baseline.md"),
+        _m("20260628T0905-MASTER-to-MAIN-eval-baseline-ratify.md", "MASTER", "MAIN", "directive", "20260628T0903-MAIN-to-MASTER-eval-baseline.md"),
+        _m("20260628T0906-DEV-to-MAIN-validator-slice1.md", "DEV", "MAIN", "deliverable", "20260628T0902-MASTER-to-DEV-validator-slice1.md"),
+        _m("20260628T0907-MASTER-to-MAIN-eval-baseline-check.md", "MASTER", "MAIN", "check", "20260628T0904-MAIN-to-MASTER-eval-baseline.md"),
+        _m("20260628T0908-MAIN-to-MASTER-validator-slice1.md", "MAIN", "MASTER", "verification", "20260628T0906-DEV-to-MAIN-validator-slice1.md"),
+        _m("20260628T0909-MASTER-to-MAIN-validator-slice1-check.md", "MASTER", "MAIN", "check", "20260628T0908-MAIN-to-MASTER-validator-slice1.md"),
+        _m("20260628T0910-MASTER-to-DEV-validator-slice2.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
+        _m("20260628T0911-DEV-to-MAIN-validator-slice2.md", "DEV", "MAIN", "deliverable", "20260628T0910-MASTER-to-DEV-validator-slice2.md"),
+        _m("20260628T0912-MAIN-to-MASTER-validator-slice2.md", "MAIN", "MASTER", "verification", "20260628T0911-DEV-to-MAIN-validator-slice2.md"),
     ]
 
 
@@ -185,14 +186,14 @@ def test_liveness_does_not_flag_fresh() -> None:
 
 def test_snapshot_matches_live_split() -> None:
     snap = _snapshot()
-    # open set = {0652 directive, 0702 check, 0713 check, 0735 verification}
+    # open set = {0905 directive, 0907 check, 0909 check, 0912 verification}
     assert _names(actionable_open(snap)) == {
-        "20260628T0652-MASTER-to-MAIN-eval-baseline-ratify.md",  # directive, still pending
-        "20260628T0735-MAIN-to-MASTER-validator-slice2.md",      # verification awaiting check
+        "20260628T0905-MASTER-to-MAIN-eval-baseline-ratify.md",  # directive, still pending
+        "20260628T0912-MAIN-to-MASTER-validator-slice2.md",      # verification awaiting check
     }
     assert _names(stale_open(snap)) == {
-        "20260628T0702-MASTER-to-MAIN-eval-baseline-check.md",
-        "20260628T0713-MASTER-to-MAIN-validator-slice1-check.md",
+        "20260628T0907-MASTER-to-MAIN-eval-baseline-check.md",
+        "20260628T0909-MASTER-to-MAIN-validator-slice1-check.md",
     }
 
 
