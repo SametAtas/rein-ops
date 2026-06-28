@@ -39,6 +39,19 @@ class Problem:
     detail: str
 
 
+@dataclass(frozen=True)
+class Msg:
+    """A parsed BUS message: its basename, frontmatter fields, and body.
+
+    Shared by slice 2's turn/reply logic. Fields are raw strings (ratified stays
+    a string here); the bool coercion lives in validate_message.
+    """
+
+    filename: str
+    fields: dict[str, str]
+    body: str
+
+
 def _as_bool(value: str | None) -> bool | None:
     """Parse a frontmatter bool; None when the value is absent or not a bool."""
     if value is None:
@@ -85,6 +98,17 @@ def _split_frontmatter(
         fields[key.strip()] = value.strip()
     body = "\n".join(lines[close + 1:])
     return fields, body, None, None
+
+
+def parse_message(text: str, filename: str) -> Msg:
+    """Parse a BUS message into (basename, frontmatter fields, body).
+
+    Reuses the slice-1 frontmatter parser. On unparseable frontmatter the fields
+    are empty - such a message answers nothing and holds no turn, the safe
+    degradation; validate_message is what flags the malformation.
+    """
+    fields, body, _rule, _detail = _split_frontmatter(text)
+    return Msg(filename=os.path.basename(filename), fields=fields or {}, body=body)
 
 
 def validate_message(text: str, filename: str) -> list[Problem]:

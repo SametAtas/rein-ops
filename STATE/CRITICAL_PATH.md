@@ -28,6 +28,7 @@
      2026-06-28T0714Z (BUS/20260628T0714-MASTER-to-DEV-validator-slice2.md, ratified):
      DERIVED-turn computation + reply legality, RE-SCOPED to PROTOCOL.md (the old
      "advance turn in IN_FLIGHT" is obsolete - no IN_FLIGHT/token). Surfaces stale-open
-     messages (e.g. the fulfilled-but-unanswered 0652). Slice 3 (NEEDS-HUMAN render +
-     liveness) follows. Awaiting DEV.
+     messages (e.g. the fulfilled-but-unanswered 0652). DEV DELIVERED 2026-06-28T0726Z
+     (BUS/20260628T0726-DEV-to-MAIN-validator-slice2.md); now in MAIN's verify+commit
+     queue, then MASTER checks. Slice 3 (NEEDS-HUMAN render + liveness) follows.
    - dup.function index cache (DECISIONS #47) when loop-latency evidence warrants.
