@@ -26,9 +26,15 @@
      MASTER-checked 2026-06-28T0713Z (8-msg live-bus dogfood clean, exit 0;
      no-self-bless held DEV->AUDITOR->MAIN). SLICE 2 DISPATCHED to DEV
      2026-06-28T0714Z (BUS/20260628T0714-MASTER-to-DEV-validator-slice2.md, ratified):
-     DERIVED-turn computation + reply legality, RE-SCOPED to PROTOCOL.md (the old
-     "advance turn in IN_FLIGHT" is obsolete - no IN_FLIGHT/token). Surfaces stale-open
-     messages (e.g. the fulfilled-but-unanswered 0652). DEV DELIVERED 2026-06-28T0726Z
-     (BUS/20260628T0726-DEV-to-MAIN-validator-slice2.md); now in MAIN's verify+commit
-     queue, then MASTER checks. Slice 3 (NEEDS-HUMAN render + liveness) follows.
+     DERIVED-turn computation + reply legality. SLICE 2 CORE DONE - commit `172dd0b`,
+     34/34 tests, MASTER-checked 2026-06-28T0743Z: the turn CLI reproduces the hand-
+     computed turn EXACTLY (positive control). TWO FLAGS recorded in the check: (1)
+     the delivery shipped `--status`/status.py early = UNRATIFIED slice-3 scope ("build
+     the rest" is NOT a standing authorization; each slice needs its own ratified
+     directive); (2) that --status MISCLASSIFIES a fresh awaiting-check verification
+     (0735) as stale + reports 0 actionable - do not drive archival off it yet.
+     SLICE 3 DISPATCHED to DEV 2026-06-28T0744Z
+     (BUS/20260628T0744-MASTER-to-DEV-validator-slice3.md, ratified): corrected
+     actionable/stale/needs-human classification + liveness (stalled-thread) detection,
+     governing+fixing the early status.py. Closing slice 3 closes item 5.
    - dup.function index cache (DECISIONS #47) when loop-latency evidence warrants.
