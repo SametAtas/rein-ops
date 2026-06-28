@@ -22,6 +22,10 @@
    + audit.py -> RESULTS.md -> paired stat test. Multi-week clock; no constellation
    action until the corpus fills.
 
+CONSTELLATION STATUS: no active build work. Item 4 (Keystone) is a multi-week human-
+paced grind; item 5 validator is COMPLETE. Next constellation action is at Keystone
+N>=50 (item 4) OR a new MASTER-chosen direction. MASTER quiesces (poll + waiting).
+
 5. PARALLEL (unblocked once the arm is pinned):
    - rein-ops hardening: validator SLICE 1 DONE - commit `9e45eaf`, 23/23 tests,
      MASTER-checked 2026-06-28T0713Z (8-msg live-bus dogfood clean, exit 0;
@@ -47,7 +51,14 @@
      re-check FAILED on the SUITE: 54 passed / 1 FAILED - `test_live_human_queue_open_item`
      reads the LIVE NEEDS-HUMAN and rotted when the item-4 gate was resolved (brittle
      live-coupled test, violates the fixture-pinned guardrail). DE-BRITTLE DISPATCHED
-     to DEV 2026-06-28T0813Z (BUS/...detrittle-tests.md, ratified): make the live
-     positive-control tests fixture-based, suite green + deterministic w.r.t. live STATE.
-     Item 5 closes only after the suite is green and rot-proof.
+     to DEV 2026-06-28T0813Z (BUS/...detrittle-tests.md, ratified): de-brittled the
+     live tests. DELIVERED+committed (5ade115); MASTER CHECKED + CLOSED item 5
+     2026-06-28T0832Z (BUS/...detrittle-check.md): suite GREEN 53/53, test_status.py
+     fixture-based (grep Keystone=0), classification intact, rot-proof to RED.
+     VALIDATOR COMPLETE (slices 1-3). RESIDUAL DE-BRITTLE DISPATCHED to DEV
+     2026-06-28T0843Z (BUS/...residual-detrittle.md, ratified): convert the last two
+     live-coupled tests (test_turn.py test_live_answered_not_open -> fixture;
+     test_validator.py test_live_bus_messages_clean -> glob-smoke) so NO test couples to
+     hard-coded live BUS filenames and none SKIPs on archival. Closes the brittleness
+     class entirely. Awaiting DEV.
    - dup.function index cache (DECISIONS #47) when loop-latency evidence warrants.
