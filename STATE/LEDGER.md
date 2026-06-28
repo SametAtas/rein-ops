@@ -21,3 +21,15 @@
 - L5 ENGINE REPO STAYS PURE. rein-ops and rein-steering-eval are separate repos;
   no orchestration or experiment code ever lands in rein/. Monetization = the
   engine/Ringo, never the internal tooling.
+
+- L6 (2026-06-28) BENCHMARK SAMPLE-SECRETS ARE COMMITTABLE FIXTURES. The
+  rein-steering-eval baseline commits `benchmarks/securityeval_raw.jsonl` AS-IS even
+  though it carries fake/sample keys (e.g. CWE-321 `sk-Hn0...`): it is the
+  SecurityEval input corpus (121 intentionally-vulnerable tasks), required for
+  reproducibility, and the repo is private with NO remote. Same call rein makes for
+  its own committed sample-secret test fixtures. MAIN bounced on the 0-secret gate;
+  MASTER independently verified the literals are confined to that one corpus file, no
+  real key file is staged (the real `.gemini.env` is outside the repo), and there is
+  no remote - then ratified. CONDITION: publishing rein-steering-eval (adding a public
+  remote / pushing) is a NEW human gate; it first needs rein's sample-secret handling
+  (documented exemption + push-protection OFF), never a bare push.

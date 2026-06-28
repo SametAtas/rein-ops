@@ -9,16 +9,17 @@
    `rein.__file__` is in site-packages (NOT src/) and `rein.__version__ == 0.4.0`.
    The experiment no longer tracks the moving repo HEAD.
 
-3. THROUGHPUT 429 fix (rein-steering-eval) - DONE + independently audited, LIVE in
-   the working tree (per-day quota 429 now stops cleanly instead of churning).
-   FOLLOW-UP (leak-safe baseline commit): DISPATCHED to MAIN 2026-06-28T0632Z
-   (BUS/20260628T0632-MASTER-to-MAIN-eval-baseline.md, ratified). Repo is git-init-ed
-   with a .gitignore (excludes .env/.gemini.env) but 0 commits; MAIN commits the
-   baseline after a 0-secret staged scan + pin-intact check. Awaiting MAIN.
+3. THROUGHPUT 429 fix + leak-safe baseline - DONE. Baseline committed `5a39750`
+   (23 files, source-only); MASTER CHECKED it 2026-06-28T0702Z
+   (BUS/20260628T0702-MASTER-to-MAIN-eval-baseline-check.md): SHA/count match,
+   secrets confined to securityeval_raw.jsonl, no real key, 0 remotes, pin intact
+   (rein 0.4.0 in site-packages). LEDGER L6. Item 3 CLOSED.
 
-4. RESTART clean Keystone runs under pinned 0.4.0 + fixed pacing; `window.sh` daily
-   after 15:00 local; finalize at N>=50 -> aggregate/audit -> RESULTS.md -> paired
-   stat test.
+4. RESTART clean Keystone runs under pinned 0.4.0 + fixed pacing - NOW (item 1).
+   HUMAN GATE (consumes free Gemini quota, starts the multi-week clock): routed to
+   NEEDS-HUMAN 2026-06-28T0702Z. Run `window.sh` daily after 15:00 local; finalize at
+   N>=50 -> aggregate/audit -> RESULTS.md -> paired stat test. The baseline (5a39750)
+   + the pinned 0.4.0 arm are the frozen config the run sits on.
 
 5. PARALLEL (unblocked once the arm is pinned):
    - rein-ops hardening: validator SLICE 1 DISPATCHED to DEV 2026-06-28T0643Z
