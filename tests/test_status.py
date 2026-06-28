@@ -12,7 +12,7 @@ import os
 import pytest
 
 from validator.cli import main
-from validator.core import Msg, parse_message
+from validator.core import Msg
 from validator.status import (
     actionable_open,
     human_queue,
@@ -34,13 +34,13 @@ _NEEDS_HUMAN = """\
 
 Format: `- [<UTCstamp>] [<role>] <action> - <how to respond>`
 
-- [20260628T0702] [MASTER] Start the clean Keystone N>=50 run (CRITICAL_PATH#4) -
+- [20260628T0702] [MASTER] Start the clean N>=50 measurement run (CRITICAL_PATH#4) -
   the frozen config is ready: reply "running" once the first window is in.
 
 ## Resolved
 
-- [20260628] [MAIN] Publish rein-engine 0.4.0 to PyPI - DONE (owner published v0.4.0).
-- [20260628] [MAIN] Confirm the Keystone arm pin - DONE ("pin go").
+- [20260628] [MAIN] Publish the engine release to PyPI - DONE (owner published it).
+- [20260628] [MAIN] Confirm the measurement arm pin - DONE ("pin go").
 """
 
 
@@ -51,7 +51,7 @@ def test_human_queue_returns_only_open_item() -> None:
     only = items[0]
     assert only.stamp == "20260628T0702"
     assert only.role == "MASTER"
-    assert only.text.startswith("Start the clean Keystone N>=50 run")
+    assert only.text.startswith("Start the clean N>=50 measurement run")
 
 
 def test_human_queue_excludes_resolved_section() -> None:
@@ -203,7 +203,11 @@ def test_actionable_and_stale_are_disjoint() -> None:
 
 # -- CLI --status (BAR row 3) -------------------------------------------------
 
-def test_cli_status_live_exit_zero(capsys) -> None:
+def test_live_smoke(capsys) -> None:
+    # The ONE live-coupled test, and it is STRUCTURAL only: `--status .` exits 0
+    # (well-formed bus + STATE) and human_queue parses the live NEEDS-HUMAN with no
+    # problems. It asserts NO specific item, filename, or count, so normal
+    # constellation work (resolving a gate, archiving a message) never reds it.
     if not os.path.isdir(os.path.join(_ROOT, "BUS")):
         pytest.skip("live BUS/ archived")
     rc = main(["--status", _ROOT])
@@ -213,6 +217,11 @@ def test_cli_status_live_exit_zero(capsys) -> None:
     assert "STALE-OPEN archival candidates" in out
     assert "LIVENESS stalled threads" in out
     assert rc == 0  # liveness is advisory, never fails the exit
+    human_path = os.path.join(_ROOT, "NEEDS-HUMAN.md")
+    if os.path.isfile(human_path):
+        with open(human_path, encoding="utf-8") as fh:
+            _items, problems = human_queue(fh.read())
+        assert problems == []  # structural: parses cleanly, whatever the content
 
 
 def test_cli_status_planted_dangling_re_exit_nonzero(tmp_path, capsys) -> None:
@@ -255,27 +264,11 @@ def test_cli_status_planted_bad_message_exit_nonzero(tmp_path, capsys) -> None:
     assert rc == 1
 
 
-# -- live positive controls (skip if archived, BAR row 1/2) -------------------
-
-def test_live_human_queue_open_item(capsys) -> None:
-    path = os.path.join(_ROOT, "NEEDS-HUMAN.md")
-    if not os.path.isfile(path):
-        pytest.skip("NEEDS-HUMAN.md not present")
-    with open(path, encoding="utf-8") as fh:
-        items, problems = human_queue(fh.read())
-    assert problems == []
-    # the live OPEN item is the Keystone start ask; Resolved DONE lines excluded.
-    assert any("Keystone" in it.text for it in items)
-    assert all("DONE" not in it.text for it in items)
-
-
-def test_live_stale_includes_known_checks() -> None:
-    bus = os.path.join(_ROOT, "BUS")
-    if not os.path.isdir(bus):
-        pytest.skip("live BUS/ archived")
-    import glob
-    msgs = [parse_message(open(p, encoding="utf-8").read(), p) for p in glob.glob(os.path.join(bus, "*.md"))]
-    stale = _names(stale_open(msgs))
-    for known in ("0702-MASTER-to-MAIN-eval-baseline-check", "0713-MASTER-to-MAIN-validator-slice1-check"):
-        if any(known in m.filename for m in msgs):
-            assert any(known in n for n in stale), f"{known} should be a stale archive candidate"
+# The two former "live positive control" tests (live NEEDS-HUMAN content + live
+# stale filenames) were brittle - normal constellation work (resolving a gate,
+# archiving a check) reddened them. Their coverage is now fixture-based:
+# human_queue open/Resolved -> test_human_queue_*; stale == checks ->
+# test_open_check_is_stale_not_actionable / test_stale_open_contains_only_checks;
+# actionable surfaced -> test_directive_deliverable_bounce_open_are_actionable;
+# liveness on an overtaken actionable -> test_liveness_flags_stalled_actionable.
+# The only remaining live touch is the structural test_live_smoke above.
