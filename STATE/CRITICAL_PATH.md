@@ -22,10 +22,12 @@
    + the pinned 0.4.0 arm are the frozen config the run sits on.
 
 5. PARALLEL (unblocked once the arm is pinned):
-   - rein-ops hardening: validator SLICE 1 DISPATCHED to DEV 2026-06-28T0643Z
-     (BUS/20260628T0643-MASTER-to-DEV-validator-slice1.md, ratified): pure
-     parse/validate of a BUS message + STATE files vs PROTOCOL.md, fail-closed,
-     live bus/STATE as positive control. Built to PROTOCOL.md (DESIGN.md v1 turn
-     model is REJECTED, history only). Slices 2 (one bus hop) + 3 (NEEDS-HUMAN
-     queue) follow. Awaiting DEV.
+   - rein-ops hardening: validator SLICE 1 DONE - commit `9e45eaf`, 23/23 tests,
+     MASTER-checked 2026-06-28T0713Z (8-msg live-bus dogfood clean, exit 0;
+     no-self-bless held DEV->AUDITOR->MAIN). SLICE 2 DISPATCHED to DEV
+     2026-06-28T0714Z (BUS/20260628T0714-MASTER-to-DEV-validator-slice2.md, ratified):
+     DERIVED-turn computation + reply legality, RE-SCOPED to PROTOCOL.md (the old
+     "advance turn in IN_FLIGHT" is obsolete - no IN_FLIGHT/token). Surfaces stale-open
+     messages (e.g. the fulfilled-but-unanswered 0652). Slice 3 (NEEDS-HUMAN render +
+     liveness) follows. Awaiting DEV.
    - dup.function index cache (DECISIONS #47) when loop-latency evidence warrants.
