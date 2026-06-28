@@ -33,8 +33,15 @@
      the rest" is NOT a standing authorization; each slice needs its own ratified
      directive); (2) that --status MISCLASSIFIES a fresh awaiting-check verification
      (0735) as stale + reports 0 actionable - do not drive archival off it yet.
-     SLICE 3 DISPATCHED to DEV 2026-06-28T0744Z
-     (BUS/20260628T0744-MASTER-to-DEV-validator-slice3.md, ratified): corrected
-     actionable/stale/needs-human classification + liveness (stalled-thread) detection,
-     governing+fixing the early status.py. Closing slice 3 closes item 5.
+     SLICE 3 (0744) was delivered + committed (7c63843) but MASTER CHECK FAILED
+     2026-06-28T0753Z (BUS/20260628T0753-...slice3-check.md): the classification
+     VIOLATES 0744 BAR-1 - it made `verification` TERMINAL/stale, so a verification
+     awaiting a MASTER check shows as a stale archival candidate and ACTIONABLE=0 (the
+     exact defect 0744 was written to fix; 51 tests + an AUDITOR pass missed it because
+     they checked the code's own design, not the ratified spec). Also implemented
+     `superseded->stale` instead of the specified LIVENESS signal. ITEM 5 NOT COMPLETE.
+     FIX DISPATCHED to DEV 2026-06-28T0754Z (BUS/...slice3-fix.md, ratified):
+     verification belongs in ACTIONABLE, stale = open `check` ONLY, superseded/old
+     actionable -> LIVENESS not archival, with a MANDATORY regression test on the
+     verification-actionable case. Item 5 closes only after the re-check passes.
    - dup.function index cache (DECISIONS #47) when loop-latency evidence warrants.
