@@ -18,7 +18,7 @@ import os
 import sys
 
 from .core import Problem, parse_message, validate_message, validate_state
-from .status import actionable_open, human_queue, stale_open
+from .status import actionable_open, human_queue, liveness_stalled, stale_open
 from .turn import ROLES, open_messages, reply_problems, turn_for
 
 
@@ -87,6 +87,13 @@ def _status(root: str) -> list[Problem]:
     print(f"STALE-OPEN archival candidates ({len(stale)}):")
     for m in stale:
         print(f"  {m.filename} (type: {m.fields.get('type', '?')}, to: {m.fields.get('to', '?')})")
+
+    # LIVENESS is advisory (chase / human-archive), not a fail-closed violation,
+    # so it is reported but NOT added to the exit-determining problems.
+    stalled = liveness_stalled(messages)
+    print(f"LIVENESS stalled threads ({len(stalled)}):")
+    for p in stalled:
+        print(f"  {p.file}: {p.detail}")
     return problems
 
 

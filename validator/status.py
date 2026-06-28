@@ -1,18 +1,26 @@
-"""Slice 3: NEEDS-HUMAN queue render + liveness / stale-thread detection.
+"""Slice 3: NEEDS-HUMAN queue render + actionable / stale / liveness split.
 
 Pure logic only - no filesystem access (the CLI does the reads, mirroring the
-slice-1/2 split). Two concerns:
+slice-1/2 split). Three concerns:
 
   - human_queue(text): parse NEEDS-HUMAN.md and return only the OPEN items (the
     lines above/outside the "Resolved" section). Fail-closed: a malformed open
     line yields a `human.bad-line` Problem, never a silent drop.
   - actionable_open / stale_open: classify slice-2's OPEN set into the messages
-    that still await real work versus archival candidates (terminal acks and
-    messages superseded by a newer open message to the same role).
+    that still await real work versus the one terminal type that is safe to
+    archive.
+  - liveness_stalled: surface an OPEN actionable message that newer traffic has
+    overtaken without an answer - a thread to chase / hand to a human, NOT an
+    archival candidate.
 
-PROTOCOL.md is the contract: directive/deliverable/bounce are the types that
-hold a real pending turn; check/verification are terminal acknowledgments that
-need no reply and are archive candidates.
+PROTOCOL.md is the contract. The split that makes archival safe:
+  - ACTIONABLE = directive / deliverable / verification / bounce. A verification
+    AWAITS the recipient's check, so it is actionable until that check answers it;
+    treating it as terminal is what let an awaiting-check verification be
+    mis-archived.
+  - STALE-OPEN = open `check` ONLY. A check expects no reply, so it is the single
+    unconditionally-safe archival candidate. A still-pending actionable message is
+    never bucketed safe-to-archive; if it has gone stale, LIVENESS surfaces it.
 """
 
 from __future__ import annotations
@@ -23,13 +31,17 @@ from dataclasses import dataclass
 from .core import Msg, Problem
 from .turn import open_messages
 
-# Types that still await someone's real work when OPEN:
-#   directive  -> awaits the addressed DEV/MAIN
-#   deliverable-> awaits MAIN's verify
-#   bounce     -> awaits MASTER's re-direction
-ACTIONABLE_TYPES = ("directive", "deliverable", "bounce")
-# Terminal acknowledgments - open-by-design, no reply expected, archive candidates.
-TERMINAL_TYPES = ("check", "verification")
+# Open types that still await someone's real work:
+#   directive   -> awaits the addressed DEV/MAIN
+#   deliverable -> awaits MAIN's verify
+#   verification-> awaits the recipient's check (NOT terminal)
+#   bounce      -> awaits MASTER's re-direction
+ACTIONABLE_TYPES = ("directive", "deliverable", "verification", "bounce")
+# The only terminal type: a check expects no reply, so an open check is the one
+# safe-to-archive case. Nothing else belongs in stale-open.
+STALE_TYPES = ("check",)
+# An open actionable message overtaken by this many newer bus messages is stalled.
+LIVENESS_THRESHOLD = 3
 
 # `- [<stamp>] [<role>] <action> - <how to respond>` ; action/how span multiple
 # wrapped lines, so the line-joining happens before this matches a single item.
@@ -94,49 +106,34 @@ def human_queue(text: str) -> tuple[list[HumanItem], list[Problem]]:
     return items, problems
 
 
-def _superseded(msg: Msg, opens: list[Msg]) -> bool:
-    """True if a different OPEN message to the same `to:` role is strictly newer.
-
-    'Newer' = a later UTC-stamp filename (filenames sort by time). Such a message
-    has overtaken *msg* as the live one for that role, so *msg* is an archival
-    candidate, not a real pending turn.
-    """
-    to = msg.fields.get("to")
-    if to is None:
-        return False
-    return any(
-        other.filename != msg.filename
-        and other.fields.get("to") == to
-        and other.filename > msg.filename
-        for other in opens
-    )
-
-
 def actionable_open(messages: list[Msg]) -> list[Msg]:
-    """OPEN messages that still await real work (directive/deliverable/bounce).
+    """OPEN messages that still await real work, oldest-first.
 
-    A directive/deliverable/bounce that is superseded by a newer open message to
-    the same role is NOT actionable - it has been overtaken and belongs in
-    stale_open instead.
+    directive/deliverable/verification/bounce: each is pending until answered. A
+    verification is included because it awaits the recipient's check. Supersession
+    does NOT remove a message here - a still-pending message is never silently
+    dropped; liveness_stalled flags it if it has gone stale.
     """
-    opens = open_messages(messages)
-    return [
-        m for m in opens
-        if m.fields.get("type") in ACTIONABLE_TYPES and not _superseded(m, opens)
-    ]
+    return [m for m in open_messages(messages) if m.fields.get("type") in ACTIONABLE_TYPES]
 
 
 def stale_open(messages: list[Msg]) -> list[Msg]:
-    """OPEN messages that are archival candidates, oldest-first.
+    """OPEN `check` messages - the only terminal, safe-to-archive type, oldest-first."""
+    return [m for m in open_messages(messages) if m.fields.get("type") in STALE_TYPES]
 
-    Two cases:
-      - terminal acknowledgments (check/verification) - open by design, no reply
-        is expected;
-      - any open message superseded by a newer open message to the same `to:`
-        role.
+
+def liveness_stalled(messages: list[Msg]) -> list[Problem]:
+    """OPEN actionable messages overtaken by >= LIVENESS_THRESHOLD newer bus
+    messages without an answer: a stalled thread to chase / investigate / hand to
+    a human, NOT an archival candidate. PROTOCOL.md LIVENESS, mechanized.
     """
-    opens = open_messages(messages)
-    return [
-        m for m in opens
-        if m.fields.get("type") in TERMINAL_TYPES or _superseded(m, opens)
-    ]
+    problems: list[Problem] = []
+    for m in actionable_open(messages):
+        newer = sum(1 for other in messages if other.filename > m.filename)
+        if newer >= LIVENESS_THRESHOLD:
+            to = m.fields.get("to", "?")
+            problems.append(Problem(
+                m.filename, "liveness.stalled",
+                f"{to} not acted on {m.filename} across {newer} newer",
+            ))
+    return problems

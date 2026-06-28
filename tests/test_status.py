@@ -16,6 +16,7 @@ from validator.core import Msg, parse_message
 from validator.status import (
     actionable_open,
     human_queue,
+    liveness_stalled,
     stale_open,
 )
 
@@ -87,7 +88,7 @@ def test_human_queue_empty_and_header_only() -> None:
 # -- actionable_open / stale_open (BAR row 2) ---------------------------------
 
 def _snapshot() -> list[Msg]:
-    """Mirrors the live bus shape: 4 open, 0 actionable, 4 stale."""
+    """Mirrors the live bus shape: 4 open, 2 actionable, 2 stale."""
     return [
         _m("20260628T0632-MASTER-to-MAIN-eval-baseline.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#3"),
         _m("20260628T0643-MASTER-to-DEV-validator-slice1.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#5"),
@@ -115,43 +116,83 @@ def test_actionable_open_pending_directive() -> None:
     assert stale_open(msgs) == []
 
 
-def test_terminal_ack_is_stale_not_actionable() -> None:
-    # An open check/verification awaits no reply -> stale, never actionable.
-    chk = _m("20260628T0901-MASTER-to-MAIN-x.md", "MASTER", "MAIN", "check", "CRITICAL_PATH#1")
+def test_open_verification_is_actionable_not_stale() -> None:
+    # REGRESSION (the exact defect): an open verification awaiting a MASTER check
+    # is ACTIONABLE and must be ABSENT from STALE-OPEN.
     ver = _m("20260628T0902-MAIN-to-MASTER-y.md", "MAIN", "MASTER", "verification", "CRITICAL_PATH#1")
-    msgs = [chk, ver]
+    msgs = [ver]
+    assert _names(actionable_open(msgs)) == {ver.filename}
+    assert stale_open(msgs) == []
+
+
+def test_open_check_is_stale_not_actionable() -> None:
+    # A check expects no reply -> the one terminal, archivable type.
+    chk = _m("20260628T0901-MASTER-to-MAIN-x.md", "MASTER", "MAIN", "check", "CRITICAL_PATH#1")
+    msgs = [chk]
     assert actionable_open(msgs) == []
-    assert _names(stale_open(msgs)) == {chk.filename, ver.filename}
+    assert _names(stale_open(msgs)) == {chk.filename}
 
 
-def test_superseded_directive_is_stale_not_actionable() -> None:
-    # Two open directives to the same role: the older is superseded -> stale.
+def test_directive_deliverable_bounce_open_are_actionable() -> None:
+    d = _m("20260628T1000-MASTER-to-DEV-a.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#1")
+    v = _m("20260628T1100-DEV-to-MAIN-b.md", "DEV", "MAIN", "deliverable", "20260628T1000-MASTER-to-DEV-a.md")
+    b = _m("20260628T1200-MAIN-to-MASTER-c.md", "MAIN", "MASTER", "bounce", "CRITICAL_PATH#2")
+    # d is answered by v; v and b remain open and actionable.
+    msgs = [d, v, b]
+    assert _names(actionable_open(msgs)) == {v.filename, b.filename}
+    assert stale_open(msgs) == []
+
+
+def test_superseded_directive_is_actionable_not_stale() -> None:
+    # Two open directives to the same role: BOTH stay actionable; neither is
+    # auto-archived. The older is surfaced by LIVENESS, never by STALE-OPEN.
     old = _m("20260628T1000-MASTER-to-MAIN-a.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#1")
     new = _m("20260628T1100-MASTER-to-MAIN-b.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#2")
     msgs = [old, new]
-    assert _names(actionable_open(msgs)) == {new.filename}  # only the newer is live
-    assert _names(stale_open(msgs)) == {old.filename}
-
-
-def test_supersede_is_per_to_role() -> None:
-    # Different `to:` roles never supersede each other.
-    a = _m("20260628T1000-MASTER-to-DEV-a.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#1")
-    b = _m("20260628T1100-MAIN-to-MASTER-b.md", "MAIN", "MASTER", "bounce", "CRITICAL_PATH#2")
-    msgs = [a, b]
-    assert _names(actionable_open(msgs)) == {a.filename, b.filename}
+    assert _names(actionable_open(msgs)) == {old.filename, new.filename}
     assert stale_open(msgs) == []
+
+
+def test_stale_open_contains_only_checks() -> None:
+    # BAR-3: no directive/verification/deliverable/bounce ever appears in STALE-OPEN.
+    msgs = [
+        _m("20260628T1000-MASTER-to-DEV-a.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#1"),
+        _m("20260628T1100-MAIN-to-MASTER-b.md", "MAIN", "MASTER", "verification", "CRITICAL_PATH#2"),
+        _m("20260628T1200-MASTER-to-MAIN-c.md", "MASTER", "MAIN", "check", "CRITICAL_PATH#3"),
+        _m("20260628T1300-DEV-to-MAIN-d.md", "DEV", "MAIN", "deliverable", "CRITICAL_PATH#4"),
+    ]
+    assert {m.fields["type"] for m in stale_open(msgs)} == {"check"}
+
+
+def test_liveness_flags_stalled_actionable() -> None:
+    # BAR-4: an open actionable message overtaken by >= 3 newer messages is stalled
+    # (surfaced by LIVENESS), and is NOT an archival candidate.
+    old = _m("20260628T1000-MASTER-to-MAIN-a.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#1")
+    n1 = _m("20260628T1001-MAIN-to-MASTER-b.md", "MAIN", "MASTER", "verification", "CRITICAL_PATH#2")
+    n2 = _m("20260628T1002-MASTER-to-MAIN-c.md", "MASTER", "MAIN", "check", "20260628T1001-MAIN-to-MASTER-b.md")
+    n3 = _m("20260628T1003-MASTER-to-MAIN-d.md", "MASTER", "MAIN", "directive", "CRITICAL_PATH#3")
+    msgs = [old, n1, n2, n3]
+    stalled = liveness_stalled(msgs)
+    assert any(p.file == old.filename and p.rule == "liveness.stalled" for p in stalled)
+    assert old.filename not in _names(stale_open(msgs))
+
+
+def test_liveness_does_not_flag_fresh() -> None:
+    a = _m("20260628T1000-MASTER-to-DEV-a.md", "MASTER", "DEV", "directive", "CRITICAL_PATH#1")
+    b = _m("20260628T1001-DEV-to-MAIN-b.md", "DEV", "MAIN", "deliverable", "CRITICAL_PATH#2")
+    assert liveness_stalled([a, b]) == []  # only 1 newer -> below threshold
 
 
 def test_snapshot_matches_live_split() -> None:
     snap = _snapshot()
-    assert actionable_open(snap) == []  # nothing awaits real work
-    stale = _names(stale_open(snap))
-    # the 0702/0713 checks the BAR names, plus the superseded ratify + slice2 verification
-    assert stale == {
-        "20260628T0652-MASTER-to-MAIN-eval-baseline-ratify.md",
+    # open set = {0652 directive, 0702 check, 0713 check, 0735 verification}
+    assert _names(actionable_open(snap)) == {
+        "20260628T0652-MASTER-to-MAIN-eval-baseline-ratify.md",  # directive, still pending
+        "20260628T0735-MAIN-to-MASTER-validator-slice2.md",      # verification awaiting check
+    }
+    assert _names(stale_open(snap)) == {
         "20260628T0702-MASTER-to-MAIN-eval-baseline-check.md",
         "20260628T0713-MASTER-to-MAIN-validator-slice1-check.md",
-        "20260628T0735-MAIN-to-MASTER-validator-slice2.md",
     }
 
 
@@ -170,7 +211,8 @@ def test_cli_status_live_exit_zero(capsys) -> None:
     assert "NEEDS-HUMAN open queue" in out
     assert "ACTIONABLE open messages" in out
     assert "STALE-OPEN archival candidates" in out
-    assert rc == 0
+    assert "LIVENESS stalled threads" in out
+    assert rc == 0  # liveness is advisory, never fails the exit
 
 
 def test_cli_status_planted_dangling_re_exit_nonzero(tmp_path, capsys) -> None:
