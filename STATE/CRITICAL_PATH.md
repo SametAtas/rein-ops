@@ -11,15 +11,20 @@
 
 3. THROUGHPUT 429 fix (rein-steering-eval) - DONE + independently audited, LIVE in
    the working tree (per-day quota 429 now stops cleanly instead of churning).
-   FOLLOW-UP: rein-steering-eval has NO git history; commit a leak-safe baseline
-   (exclude .env/cache) so the experiment is reproducible.
+   FOLLOW-UP (leak-safe baseline commit): DISPATCHED to MAIN 2026-06-28T0632Z
+   (BUS/20260628T0632-MASTER-to-MAIN-eval-baseline.md, ratified). Repo is git-init-ed
+   with a .gitignore (excludes .env/.gemini.env) but 0 commits; MAIN commits the
+   baseline after a 0-secret staged scan + pin-intact check. Awaiting MAIN.
 
 4. RESTART clean Keystone runs under pinned 0.4.0 + fixed pacing; `window.sh` daily
    after 15:00 local; finalize at N>=50 -> aggregate/audit -> RESULTS.md -> paired
    stat test.
 
 5. PARALLEL (unblocked once the arm is pinned):
-   - rein-ops hardening: build the validator slices (parse/validate a BUS message +
-     STATE file, fail-closed) so the protocol is mechanically enforced, not just
-     chat-followed. DEV task once specced.
+   - rein-ops hardening: validator SLICE 1 DISPATCHED to DEV 2026-06-28T0643Z
+     (BUS/20260628T0643-MASTER-to-DEV-validator-slice1.md, ratified): pure
+     parse/validate of a BUS message + STATE files vs PROTOCOL.md, fail-closed,
+     live bus/STATE as positive control. Built to PROTOCOL.md (DESIGN.md v1 turn
+     model is REJECTED, history only). Slices 2 (one bus hop) + 3 (NEEDS-HUMAN
+     queue) follow. Awaiting DEV.
    - dup.function index cache (DECISIONS #47) when loop-latency evidence warrants.
